@@ -7,7 +7,7 @@
     "start": "node src/index.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "ImKIJ",
   "license": "ISC",
   "dependencies": {
     "discord.js": "^14.14.1",
