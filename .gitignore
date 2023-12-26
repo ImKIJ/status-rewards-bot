@@ -127,3 +127,6 @@ dist
 .pnp.*
 
 *-lock.json
+
+# db
+*.sqlite

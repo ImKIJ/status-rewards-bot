@@ -112,9 +112,11 @@ client.on("interactionCreate", async (interaction) => {
     let reply = "Here are the current status rewards:\n";
     for (const status of statuses) {
       const role = interaction.guild.roles.cache.get(status.roleId);
-      reply += `Status: \`${status.status}\`, Reward: ${
-        role ? role : "Role not found"
-      }\n`;
+      if (!role) {
+        removeStatus(status.status);
+        continue;
+      }
+      reply += `Status: \`${status.status}\`, Reward: ${role}\n`;
     }
     return interaction.reply(reply);
   }
