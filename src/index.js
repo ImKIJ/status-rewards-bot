@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Client } = require("discord.js");
+const { Client, EmbedBuilder } = require("discord.js");
 const { logChannelId, guildId } = require("./config.json");
 
 const registerCmds = require("./registerCmds");
@@ -25,7 +25,6 @@ client.on("ready", async () => {
 });
 
 async function log(message) {
-  console.log(message);
   const logChannel = client.channels.cache.get(logChannelId);
   if (!logChannel) return;
   try {
@@ -62,21 +61,21 @@ async function updateRole(member, status, action) {
 client.on("presenceUpdate", async (oldPres, newPres) => {
   if (oldPres.guild.id !== guildId) return;
   try {
-    let oldStatus = oldPres.activities.find((activity) => activity.type === 4);
-    let newStatus = newPres.activities.find((activity) => activity.type === 4);
+    let oldStatus = oldPres.activities.find(activity => activity.type === 4);
+    let newStatus = newPres.activities.find(activity => activity.type === 4);
     const member =
       oldPres.guild.members.cache.get(oldPres.userId) ||
       (await oldPres.guild.members.fetch(oldPres.userId));
     if (!member) return;
     if (
       oldStatus?.state !== newStatus?.state &&
-      validStatuses.find((s) => s.status === newStatus?.state.toLowerCase())
+      validStatuses.find(s => s.status === newStatus?.state.toLowerCase())
     ) {
       await updateRole(member, newStatus, "add");
     }
     if (
       oldStatus?.state !== newStatus?.state &&
-      validStatuses.find((s) => s.status === oldStatus?.state.toLowerCase())
+      validStatuses.find(s => s.status === oldStatus?.state.toLowerCase())
     ) {
       await updateRole(member, oldStatus, "remove");
     }
@@ -85,40 +84,90 @@ client.on("presenceUpdate", async (oldPres, newPres) => {
   }
 });
 
-client.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", async interaction => {
   if (!interaction.isCommand()) return;
   const { commandName } = interaction;
   if (commandName === "add-status-reward") {
     const status = interaction.options.getString("status");
     const role = interaction.options.getRole("role");
-    if (validStatuses.find((s) => s.status === status.toLowerCase())) {
-      return interaction.reply("This status  is already in use!");
+    if (validStatuses.find(s => s.status === status.toLowerCase())) {
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor("Red")
+            .setTitle(":x: Error")
+            .setDescription("This status is already in use!")
+            .setTimestamp(),
+        ],
+        ephemeral: true,
+      });
     }
     await addStatus(status, role.id);
-    return interaction.reply(`Added status reward: ${status} -> ${role}`);
+    return interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x6a71f3)
+          .setTitle("✅ Reward Added!")
+          .setDescription(
+            `> **Trigger status**: \`${status}\`\n> **Role**: ${role}`
+          )
+          .setTimestamp(),
+      ],
+    });
   } else if (commandName === "remove-status-reward") {
     const status = interaction.options.getString("status");
-    if (!validStatuses.find((s) => s.status === status.toLowerCase())) {
-      return interaction.reply("This status is not in use!");
+    if (!validStatuses.find(s => s.status === status.toLowerCase())) {
+      return interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor("Red")
+            .setTitle(":x: Error")
+            .setDescription("This status is not registered for a reward!")
+            .setTimestamp(),
+        ],
+        ephemeral: true,
+      });
     }
     await removeStatus(status);
 
-    await interaction.reply(`Removed status reward: ${status}`);
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor("DarkRed")
+          .setTitle("✅ Reward Removed!")
+          .setDescription(`> **Trigger status**: \`${status}\``)
+          .setTimestamp(),
+      ],
+      ephemeral: true,
+    });
   } else if (commandName === "list-status-rewards") {
     const statuses = await getStatuses();
+    const embed = new EmbedBuilder()
+      .setColor(0x6a71f3)
+      .setTitle("📃 Status Rewards")
+      .setTimestamp()
+      .setFooter({ text: `Requested by @${interaction.user.username}` });
+
     if (statuses.length === 0) {
-      return interaction.reply("No status rewards have been added yet!");
+      return interaction.reply({
+        embeds: [
+          embed.setDescription("There are no status rewards set up yet!"),
+        ],
+      });
     }
-    let reply = "Here are the current status rewards:\n";
+    let desc = "";
+
     for (const status of statuses) {
       const role = interaction.guild.roles.cache.get(status.roleId);
       if (!role) {
         removeStatus(status.status);
         continue;
       }
-      reply += `Status: \`${status.status}\`, Reward: ${role}\n`;
+      desc += `> **Status**: \`${status.status}\` \| **Reward**: ${role}\n`;
     }
-    return interaction.reply(reply);
+    return interaction.reply({
+      embeds: [embed.setDescription(desc)],
+    });
   }
 });
 
@@ -141,7 +190,7 @@ const addStatus = async (status, roleId) => {
   updateValidStatuses();
 };
 
-const removeStatus = async (status) => {
+const removeStatus = async status => {
   db.run("DELETE FROM statuses WHERE status = ?", [status.toLowerCase()]);
   updateValidStatuses();
 };
@@ -151,8 +200,8 @@ const updateValidStatuses = async () => {
   return (validStatuses = statuses);
 };
 
-const getStatus = async (status) => {
-  return validStatuses.find((s) => s.status === status.toLowerCase());
+const getStatus = async status => {
+  return validStatuses.find(s => s.status === status.toLowerCase());
 };
 
 client.login(process.env.BOT_TOKEN);
